@@ -3,11 +3,16 @@ uuid = "7b1af06c-c50e-47b0-b9d0-62b768eff8d8"
 authors = ["Takafumi Arakaki <aka.tkf@gmail.com> and contributors"]
 version = "0.1.0"
 
+[deps]
+SplittablesBase = "171d559e-b47b-412a-8079-5efa626c420e"
+Transducers = "28d57a85-8fef-5791-bfe6-a80928e7c999"
+
 [compat]
-julia = "1"
+julia = "1.7"
 
 [extras]
+Folds = "41a02a25-b8f0-4f67-bc48-60067656b558"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test"]
+test = ["Folds", "Test"]
