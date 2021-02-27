@@ -1,6 +1,6 @@
 module FoldsTapir
 
-export TapirEx
+export TapirEx, StaticTapirEx
 
 using Base.Experimental: Tapir
 
@@ -11,6 +11,7 @@ struct TapirEx{K} <: FoldsBase.Executor
     kwargs::K
 end
 
+using Accessors: @set
 using SplittablesBase: amount
 using Transducers:
     @return_if_reduced,
@@ -20,6 +21,7 @@ using Transducers:
     combine,
     complete,
     opcompose,
+    start,
     transduce,
     unreduced
 
@@ -37,14 +39,22 @@ using Transducers:
     _reducingfunction,
     cancel!,
     combine_right_reduced,
+    foldl_nocomplete,
     issmall,
     maybe_usesimd,
     retransform,
     should_abort,
     splitcontext
 
-const SIMDFlag = Union{Bool, Symbol, Val{true}, Val{false}, Val{:ivdep}}
-
+include("utils.jl")
 include("tapir.jl")
+include("static.jl")
+
+_static_nthreads_(::Any) = Val(1)
+static_nthreads() = _static_nthreads_(nothing)
+
+function __init__()
+    @eval _static_nthreads_(::Nothing) = Val($(Threads.nthreads()))
+end
 
 end
