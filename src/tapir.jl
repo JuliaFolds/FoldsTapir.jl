@@ -44,10 +44,17 @@ function _reduce(ctx, rf::R, init::I, reducible::Reducible) where {R,I}
     else
         left, right = _halve(reducible)
         fg, bg = splitcontext(ctx)
-        local a0, b0
-        Tapir.@sync begin
-            Tapir.@spawn b0 = _reduce(bg, rf, init, right)
-            a0 = _reduce(fg, rf, init, left)
+        @static if USE_TAPIR_OUTPUT
+            Tapir.@output a0 b0
+            Tapir.@sync begin
+                Tapir.@spawn b0 = _reduce(bg, rf, init, right)
+                a0 = _reduce(fg, rf, init, left)
+            end
+        else
+            Tapir.@sync begin
+                Tapir.@spawn $b0 = _reduce(bg, rf, init, right)
+                $a0 = _reduce(fg, rf, init, left)
+            end
         end
         a = @return_if_reduced a0
         should_abort(ctx) && return a  # slight optimization

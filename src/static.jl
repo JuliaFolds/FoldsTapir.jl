@@ -43,16 +43,27 @@ end
     accs = [Symbol(:acc, i) for i in 1:N]
     spawns = map(1:N) do i
         # Like `_reduce_basecase` but without `SizedReducible`:
-        basecase = :($(accs[i]) = foldl_nocomplete(rf, start(rf, init), partitions[$i]))
+        if USE_TAPIR_OUTPUT
+            lhs = accs[i]
+        else
+            lhs = Expr(:$, accs[i])
+        end
+        basecase = :($lhs = foldl_nocomplete(rf, start(rf, init), partitions[$i]))
         if i < N
             :(Tapir.@spawn $basecase)
         else
             basecase  # run the last basecase in the root
         end
     end
+    header = if USE_TAPIR_OUTPUT
+        :(Tapir.@output($(accs...),))
+    else
+        :(local $(accs...))
+        nothing
+    end
     quote
         Base.@_inline_meta
-        local $(accs...)
+        $header
         Tapir.@sync begin
             $(spawns...)
         end

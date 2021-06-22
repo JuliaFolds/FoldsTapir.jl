@@ -12,6 +12,7 @@ struct TapirEx{K} <: FoldsBase.Executor
 end
 
 using Accessors: @set
+using Preferences
 using SplittablesBase: amount
 using Transducers:
     @return_if_reduced,
@@ -45,6 +46,11 @@ using Transducers:
     retransform,
     should_abort,
     splitcontext
+
+const USE_TAPIR_OUTPUT =
+    @load_preference("use_tapir_output", isdefined(Tapir, Symbol("@output")))
+
+set_use_tapir_output(use::Bool) = @set_preferences!("use_tapir_output" => use)
 
 include("utils.jl")
 include("tapir.jl")
