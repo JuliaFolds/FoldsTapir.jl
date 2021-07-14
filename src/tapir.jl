@@ -1,15 +1,39 @@
-Transducers.transduce(xf, rf, init, xs, ex::TapirEx) =
-    _transduce(xf, rf, init, xs; ex.kwargs...)
+struct TapirEx{
+    Basesize<:Union{Integer,Nothing},
+    SIMD,
+    Stoppable<:Union{Bool,Nothing},
+    TaskGroup,
+} <: FoldsBase.Executor
+    basesize::Basesize
+    simd::Val{SIMD}
+    stoppable::Stoppable
+    taskgroup::TaskGroup
 
-function _transduce(
-    xform::Transducer,
-    step::F,
-    init,
-    coll0;
-    simd::SIMDFlag = Val(false),
+    TapirEx(
+        basesize::Basesize,
+        simd::Val{SIMD},
+        stoppable::Stoppable,
+        taskgroup::TaskGroup,
+    ) where {Basesize,SIMD,Stoppable,TaskGroup} =
+        new{Basesize,SIMD,Stoppable,Core.Typeof(taskgroup)}(
+            basesize,
+            simd,
+            stoppable,
+            taskgroup,
+        )
+end
+
+TapirEx(;
     basesize::Union{Integer,Nothing} = nothing,
+    simd::SIMDFlag = Val(false),
     stoppable::Union{Bool,Nothing} = nothing,
-) where {F}
+    taskgroup = Tapir.taskgroup,
+) = TapirEx(basesize, asval(Bool, simd), stoppable, taskgroup)
+
+Transducers.transduce(xf, rf, init, xs, ex::TapirEx) = _transduce(xf, rf, init, xs, ex)
+
+function _transduce(xform::Transducer, step::F, init, coll0, ex::TapirEx) where {F}
+    (; basesize, simd, stoppable, taskgroup) = ex
     rf0 = _reducingfunction(xform, step; init = init)
     rf, coll = retransform(rf0, coll0)
     if stoppable === nothing
@@ -23,6 +47,7 @@ function _transduce(
             coll,
             basesize === nothing ? amount(coll) ÷ Threads.nthreads() : basesize,
         ),
+        taskgroup,
     )
     result = complete(rf, acc)
     if unreduced(result) isa DefaultInitOf
@@ -31,7 +56,7 @@ function _transduce(
     return result
 end
 
-function _reduce(ctx, rf::R, init::I, reducible::Reducible) where {R,I}
+function _reduce(ctx, rf::R, init::I, reducible::Reducible, taskgroup) where {R,I}
     if should_abort(ctx)
         return init
     end
@@ -46,14 +71,14 @@ function _reduce(ctx, rf::R, init::I, reducible::Reducible) where {R,I}
         fg, bg = splitcontext(ctx)
         @static if USE_TAPIR_OUTPUT
             Tapir.@output a0 b0
-            Tapir.@sync begin
-                Tapir.@spawn b0 = _reduce(bg, rf, init, right)
-                a0 = _reduce(fg, rf, init, left)
+            Tapir.@sync taskgroup() begin
+                Tapir.@spawn b0 = _reduce(bg, rf, init, right, taskgroup)
+                a0 = _reduce(fg, rf, init, left, taskgroup)
             end
         else
-            Tapir.@sync begin
-                Tapir.@spawn $b0 = _reduce(bg, rf, init, right)
-                $a0 = _reduce(fg, rf, init, left)
+            Tapir.@sync taskgroup() begin
+                Tapir.@spawn $b0 = _reduce(bg, rf, init, right, taskgroup)
+                $a0 = _reduce(fg, rf, init, left, taskgroup)
             end
         end
         a = @return_if_reduced a0

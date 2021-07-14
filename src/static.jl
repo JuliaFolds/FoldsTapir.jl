@@ -1,19 +1,27 @@
-struct StaticTapirEx{NThreads,SIMD} <: FoldsBase.Executor
+struct StaticTapirEx{NThreads,SIMD,TaskGroup} <: FoldsBase.Executor
     nthreads::Val{NThreads}
     simd::Val{SIMD}
+    taskgroup::TaskGroup
+
+    StaticTapirEx(
+        nthreads::Val{NThreads},
+        simd::Val{SIMD},
+        taskgroup::TaskGroup,
+    ) where {NThreads,SIMD,TaskGroup} =
+        new{NThreads,SIMD,Core.Typeof(taskgroup)}(nthreads, simd, taskgroup)
 end
 
 StaticTapirEx(;
     nthreads::Union{Val,Integer} = static_nthreads(),
     simd::SIMDFlag = Val(false),
     # stoppable::Union{Bool,Nothing} = nothing,
+    taskgroup = Tapir.taskgroup,
 ) = StaticTapirEx(
     asval(Int, nthreads),
     asval(Bool, simd),
     # asval(Union{Bool,Nothing}, stoppable),
+    taskgroup,
 )
-
-Transducers.maybe_set_simd(ex::StaticTapirEx, simd) = @set ex.simd = asval(Bool, simd)
 
 @inline function Transducers.transduce(
     xf::XF,
@@ -25,7 +33,7 @@ Transducers.maybe_set_simd(ex::StaticTapirEx, simd) = @set ex.simd = asval(Bool,
     rf0 = _reducingfunction(xf, rf; init = init)
     rf1, coll = retransform(rf0, xs)
     rf2 = maybe_usesimd(rf1, ex.simd)
-    accs = transduce_partitions(rf2, init, static_chunks(coll, ex.nthreads))
+    accs = transduce_partitions(rf2, init, static_chunks(coll, ex.nthreads), ex.taskgroup)
     result = complete(rf2, foldlargs((a, b) -> combine(rf, a, b), accs...))
     if unreduced(result) isa DefaultInitOf
         throw(EmptyResultError(rf2))
@@ -39,6 +47,7 @@ end
     rf::RF,
     init,
     partitions::NTuple{N,Any},
+    taskgroup,
 ) where {RF,N}
     accs = [Symbol(:acc, i) for i in 1:N]
     spawns = map(1:N) do i
@@ -64,27 +73,9 @@ end
     quote
         Base.@_inline_meta
         $header
-        Tapir.@sync begin
+        Tapir.@sync taskgroup() begin
             $(spawns...)
         end
         return ($(accs...),)
     end
-end
-
-function Base.show(io::IO, ex::StaticTapirEx)
-    @nospecialize ex
-    print(
-        io,
-        StaticTapirEx,
-        "(nthreads = ",
-        Val,
-        '(',
-        valueof(ex.nthreads),
-        "), simd = ",
-        Val,
-        '(',
-        valueof(ex.simd),
-        ')',
-        ')',
-    )
 end

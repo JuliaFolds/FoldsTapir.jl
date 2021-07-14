@@ -7,10 +7,7 @@ using Base.Experimental: Tapir
 import Transducers
 const FoldsBase = Transducers
 
-struct TapirEx{K} <: FoldsBase.Executor
-    kwargs::K
-end
-
+import ConstructionBase
 using Accessors: @set
 using Preferences
 using SplittablesBase: amount
@@ -55,6 +52,7 @@ set_use_tapir_output(use::Bool) = @set_preferences!("use_tapir_output" => use)
 include("utils.jl")
 include("tapir.jl")
 include("static.jl")
+include("misc.jl")
 
 _static_nthreads_(::Any) = Val(1)
 static_nthreads() = _static_nthreads_(nothing)
