@@ -13,6 +13,9 @@ function Base.show(io::IO, ex::GenericTapirEx)
     print(io, NamedTuple(ex))
 end
 
+# executor_from(::Type{Ex}, exc::PreferParallel) API
+(::Type{Ex})(kwargs::NamedTuple) where {Ex <: GenericTapirEx} = Ex(; kwargs...)
+
 
 # FIXME: Compatibility for Folds.Testing:
 # <Workaround>

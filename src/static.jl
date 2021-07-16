@@ -79,3 +79,22 @@ end
         return ($(accs...),)
     end
 end
+
+struct StaticPartitonIterator{Partitions}
+    partitions::Partitions
+end
+# TODO: actually implement `iterate`
+
+"""
+    FoldsTapir.static_partition(xs, [n])
+
+Like `Iterators.partition`, but for `StaticTapirEx`.
+"""
+function static_partition(xs, n = static_nthreads())
+    partitions = map(tuple, static_chunks(xs, n))
+    return StaticPartitonIterator(partitions)
+end
+
+static_chunks(itr::StaticPartitonIterator, _) = itr.partitions
+
+Transducers.executor_type(::StaticPartitonIterator) = StaticTapirEx
