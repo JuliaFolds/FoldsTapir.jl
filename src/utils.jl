@@ -43,5 +43,15 @@ function static_chunks(xs::AbstractArray, nchunks)
     end
 end
 
+function static_chunks(iter::Iterators.PartitionIterator{<:AbstractArray}, nchunks)
+    xs = iter.c
+    n = iter.n
+    basesize = cld(length(xs), n * valueof(nchunks))
+    return ntuple(nchunks) do i
+        ys = @view xs[min(end+1,begin+(i-1)*basesize):min(end,begin+i*basesize-1)]
+        Iterators.partition(ys, n)
+    end
+end
+
 static_chunks(xs::Iterators.Zip, nchunks) =
     map(Base.splat(zip), zip_tuples(map(it -> static_chunks(it, nchunks), xs.is)...))
