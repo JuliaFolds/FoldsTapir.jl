@@ -57,7 +57,10 @@ include("misc.jl")
 _static_nthreads_(::Any) = Val(1)
 static_nthreads() = _static_nthreads_(nothing)
 
+isprecompiling() = ccall(:jl_generating_output, Cint, ()) == 1
+
 function __init__()
+    isprecompiling() && return
     @eval _static_nthreads_(::Nothing) = Val($(Threads.nthreads()))
 end
 
